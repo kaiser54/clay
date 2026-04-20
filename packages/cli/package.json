@@ -11,6 +11,7 @@
   },
   "dependencies": {
     "@clay/core": "workspace:*",
+    "@clay/server": "workspace:*",
     "commander": "^12.0.0"
   },
   "devDependencies": {

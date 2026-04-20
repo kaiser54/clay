@@ -3,6 +3,7 @@ import { readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { Command } from "commander";
 import { generateMockData } from "@clay/core";
+import { startServer } from "@clay/server";
 
 const program = new Command();
 
@@ -47,6 +48,36 @@ program
       console.log(`Wrote ${count} records to ${outPath}`);
     } else {
       console.log(output);
+    }
+  });
+
+program
+  .command("serve <file>")
+  .description("Start a local mock API server from a TypeScript file")
+  .option("-p, --port <number>", "port to listen on", "3000")
+  .option("-c, --count <number>", "number of records per resource", "10")
+  .option("-s, --seed <number>", "seed for deterministic output")
+  .action((file: string, opts: { port: string; count: string; seed?: string }) => {
+    const filePath = resolve(process.cwd(), file);
+    let sourceCode: string;
+
+    try {
+      sourceCode = readFileSync(filePath, "utf-8");
+    } catch {
+      console.error(`Error: could not read file "${filePath}"`);
+      process.exit(1);
+    }
+
+    try {
+      startServer({
+        sourceCode,
+        port: parseInt(opts.port, 10),
+        count: parseInt(opts.count, 10),
+        seed: opts.seed !== undefined ? parseInt(opts.seed, 10) : undefined,
+      });
+    } catch (err) {
+      console.error(`Error: ${(err as Error).message}`);
+      process.exit(1);
     }
   });
 
