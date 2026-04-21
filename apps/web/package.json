@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "concurrently -n vite,api -c cyan,green \"vite\" \"tsx api.ts\"",
+    "dev": "concurrently -n vite,api -c cyan,green \"vite\" \"node --import tsx/esm api.ts\"",
     "build": "tsc -p tsconfig.app.json && vite build",
     "preview": "vite preview"
   },

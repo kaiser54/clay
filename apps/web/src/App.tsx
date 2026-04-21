@@ -47,17 +47,53 @@ export default function App() {
   const [limit, setLimit] = useState(10);
   const [page, setPage] = useState(1);
 
+  const [interfaces, setInterfaces] = useState<string[]>([]);
+  const [selectedInterface, setSelectedInterface] = useState<string>("");
+
   const [data, setData] = useState<GeneratedRecord[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [copied, setCopied] = useState(false);
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const parseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // derived
   const totalPages = data ? Math.ceil(data.length / limit) : 0;
   const paginated = data ? data.slice((page - 1) * limit, page * limit) : [];
   const outputJson = JSON.stringify(paginated, null, 2);
+
+  // ── debounced parse on source change ─────────────────────────────────────────
+  useEffect(() => {
+    if (parseTimerRef.current) clearTimeout(parseTimerRef.current);
+    parseTimerRef.current = setTimeout(async () => {
+      if (!source.trim()) {
+        setInterfaces([]);
+        setSelectedInterface("");
+        return;
+      }
+      try {
+        const res = await fetch("/api/parse", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ source }),
+        });
+        const json = await res.json();
+        const names: string[] = json.interfaces ?? [];
+        setInterfaces(names);
+        // keep selection valid; auto-select first if nothing selected yet
+        setSelectedInterface((prev) =>
+          names.includes(prev) ? prev : names[0] ?? ""
+        );
+      } catch {
+        // silently ignore parse errors while typing
+      }
+    }, 350);
+
+    return () => {
+      if (parseTimerRef.current) clearTimeout(parseTimerRef.current);
+    };
+  }, [source]);
 
   // ── generate ────────────────────────────────────────────────────────────────
   const generate = useCallback(async () => {
@@ -72,6 +108,7 @@ export default function App() {
           source,
           count,
           seed: seed !== "" ? parseInt(seed, 10) : undefined,
+          interfaceName: selectedInterface || undefined,
         }),
       });
       const json = await res.json();
@@ -84,7 +121,7 @@ export default function App() {
     } finally {
       setLoading(false);
     }
-  }, [source, count, seed, loading]);
+  }, [source, count, seed, loading, selectedInterface]);
 
   // ── keyboard shortcut ────────────────────────────────────────────────────────
   useEffect(() => {
@@ -152,6 +189,24 @@ export default function App() {
             spellCheck={false}
             placeholder="Paste a TypeScript interface…"
           />
+
+          {/* interface selector — shown only when multiple interfaces are present */}
+          {interfaces.length > 1 && (
+            <div className={styles.ifaceSelector}>
+              <span className={styles.ifaceLabel}>Generate</span>
+              <div className={styles.ifacePills}>
+                {interfaces.map((name) => (
+                  <button
+                    key={name}
+                    className={`${styles.ifacePill} ${selectedInterface === name ? styles.ifacePillActive : ""}`}
+                    onClick={() => setSelectedInterface(name)}
+                  >
+                    {name}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* options */}
           <div className={styles.options}>
