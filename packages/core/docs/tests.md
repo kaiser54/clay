@@ -13,18 +13,45 @@ pnpm --filter @clay/core test   # from repo root
 
 ## parser.test.ts
 
-Unit tests for `parseFirstInterface` and `parseTypeScript`. Each test passes a TypeScript source string and asserts the exact `SchemaField[]` shape that comes out.
+Unit tests for `parseFirstInterface` and `parseTypeScript`. Each test passes a TypeScript source string and asserts the exact `SchemaField[]` or `ParsedInterface[]` shape that comes out.
+
+### Basic parsing
 
 | Test | What it verifies |
 |---|---|
 | Flat primitives | `string`, `number`, `boolean` fields produce the correct `FieldType` |
 | Optional fields | `?` token sets `optional: true` |
 | Array fields | `string[]` produces `type: "array"` with a `$element` child |
-| Inline objects | `{ city: string }` produces `type: "object"` with two children |
+| Inline objects | `{ city: string }` produces `type: "object"` with children |
 | `Date` type | `Date` maps to `type: "date"`, not `"object"` or `"string"` |
 | Union with null | `string \| null` unwraps to `type: "string"` |
-| Multiple interfaces | `parseTypeScript` returns one entry per interface |
-| Error on no interface | `parseFirstInterface` throws when source has no interface |
+| Multiple interfaces | `parseTypeScript` returns one `ParsedInterface` per declaration |
+| Error on no interface | `parseFirstInterface` throws when source has no interface or type |
+| `ParsedInterface` shape | Results include `name` and `fields` properties |
+
+### Forward references and child types
+
+| Test | What it verifies |
+|---|---|
+| Forward-referenced interface | `User { address: Address }` where `Address` is declared after `User` — `address.children` is fully populated |
+| Array of referenced type | `Order { items: LineItem[] }` where `LineItem` is declared after `Order` — `$element.children` is populated |
+
+### `extends` inheritance
+
+| Test | What it verifies |
+|---|---|
+| Single extends | Derived interface includes all base fields before its own |
+| Literal role locked by extends | `AdminUser extends User { role: 'admin' }` always generates `"admin"` |
+
+### `type` alias support
+
+| Test | What it verifies |
+|---|---|
+| Exported type alias | `export type Profile = { ... }` parses identically to an interface |
+| String literal unions | `theme: 'light' \| 'dark'` produces `type: "string"` with `enum: ["light", "dark"]` |
+| Cross-references between types | `User.profile: Profile` where both are `type` aliases resolves to full Profile shape |
+| Mixed interface and type | `interface Address` referenced from `type User` resolves correctly |
+| Declaration order preserved | Results appear in source order |
 
 ---
 
@@ -94,3 +121,14 @@ it("myNewField is in expected range", () => {
 ```
 
 Use a fixed seed in tests to ensure CI results are stable. Use a count high enough (10–30 records) to exercise weighted distributions meaningfully.
+
+When testing enum/literal types:
+
+```ts
+it("theme is always light or dark", () => {
+  const result = generateMockData(`interface S { theme: 'light' | 'dark' }`, { count: 20, seed: 1 });
+  for (const item of result) {
+    expect(["light", "dark"]).toContain(item.theme);
+  }
+});
+```

@@ -1,6 +1,6 @@
 # parser.ts
 
-Converts a raw TypeScript source string into an array of `SchemaField[]` arrays — one per interface found. This is the first stage of the pipeline. No disk I/O happens here; everything runs against an in-memory virtual file system.
+Converts a raw TypeScript source string into a `ParsedInterface[]` — one entry per type or interface found. This is the first stage of the pipeline. No disk I/O happens here; everything runs against an in-memory virtual file system.
 
 **Dependency:** `ts-morph` (TypeScript AST wrapper)
 
@@ -8,28 +8,28 @@ Converts a raw TypeScript source string into an array of `SchemaField[]` arrays 
 
 ## Public API
 
-### `parseTypeScript(sourceCode: string): SchemaField[][]`
+### `parseTypeScript(sourceCode: string): ParsedInterface[]`
 
-Parses all interfaces in the source string. Returns one `SchemaField[]` per interface, in declaration order.
+Parses all `interface` declarations and `type` alias object literals in the source string. Returns one `ParsedInterface` per type found, in declaration order.
 
 ```ts
 import { parseTypeScript } from "@clay/core";
 
-const fields = parseTypeScript(`
+const parsed = parseTypeScript(`
   interface User { id: string; name: string }
-  interface Post { title: string; body: string }
+  export type Post = { title: string; body: string }
 `);
-// fields[0] → User fields
-// fields[1] → Post fields
+// parsed[0] → { name: "User", fields: [...] }
+// parsed[1] → { name: "Post", fields: [...] }
 ```
 
-Returns an empty array if the source contains no interfaces.
+Returns an empty array if the source contains no interfaces or type aliases.
 
 ---
 
 ### `parseFirstInterface(sourceCode: string): SchemaField[]`
 
-Convenience wrapper around `parseTypeScript`. Takes only the first interface found. Throws if none exists.
+Convenience wrapper around `parseTypeScript`. Returns the first result's `fields` array. Throws if none exists.
 
 ```ts
 import { parseFirstInterface } from "@clay/core";
@@ -46,9 +46,21 @@ Used by `generateMockData` internally, and by the CLI `generate` command.
 
 ## Internal functions
 
+### `literalValue(typeNode)`
+
+Extracts the JavaScript value from a `LiteralType` AST node:
+- `StringLiteral` → `string`
+- `NumericLiteral` → `number`
+- `TrueKeyword` / `FalseKeyword` → `boolean`
+- Anything else → `undefined`
+
+Used by `resolveTypeNode` to collect enum members from literal union types.
+
+---
+
 ### `resolveTypeNode(typeNode, interfaceMap)`
 
-Maps a single `TypeNode` from the AST to the `{ type, children }` portion of a `SchemaField`. This is a recursive function that handles every structural TypeScript type:
+Maps a single `TypeNode` from the AST to the `{ type, children, enum }` portion of a `SchemaField`. Handles every structural TypeScript type recursively:
 
 | TypeScript construct | How it's resolved |
 |---|---|
@@ -56,34 +68,108 @@ Maps a single `TypeNode` from the AST to the `{ type, children }` portion of a `
 | `number` | `{ type: "number" }` |
 | `boolean` | `{ type: "boolean" }` |
 | `Date` | `{ type: "date" }` |
+| `'admin'` (single literal) | `{ type: "string", enum: ["admin"] }` — always generates that exact value |
+| `'light' \| 'dark'` (all literals) | `{ type: "string", enum: ["light", "dark"] }` — picks one randomly |
+| `1 \| 2 \| 3` (numeric literals) | `{ type: "number", enum: [1, 2, 3] }` |
+| `string \| null` or `T \| undefined` | Strips null/undefined, resolves the remaining type |
 | `string[]` or `User[]` | `{ type: "array", children: [{ name: "$element", ... }] }` |
 | `{ city: string }` inline | `{ type: "object", children: [...] }` recursively |
-| `AnotherInterface` | `{ type: "object", children: interfaceMap.get("AnotherInterface") }` |
-| `string \| null` or `T \| undefined` | Strips null/undefined, resolves the remaining type |
+| `AnotherInterface` (type reference) | `{ type: "object", children: interfaceMap.get("AnotherInterface") }` |
 | Anything else | `{ type: "unknown" }` |
 
-The `interfaceMap` parameter is pre-populated with all interface names found in the source (pass 1 of the two-pass approach). This lets interface references resolve even when the referenced interface is declared after the one being parsed.
+The `interfaceMap` parameter is pre-populated with all interface/type names found in the source (pass 1 of the two-pass approach). This lets type references resolve even when the referenced type is declared after the one being parsed.
 
 ---
 
 ### `resolveProperty(prop, interfaceMap)`
 
 Extracts one `PropertySignature` from the AST into a complete `SchemaField`:
-- Reads the property name via `prop.getName()`
-- Checks for `?` via `prop.hasQuestionToken()`
-- Delegates type resolution to `resolveTypeNode`
+- Name via `prop.getName()`
+- Optional flag via `prop.hasQuestionToken()`
+- Type, children, and enum via `resolveTypeNode`
 
 ---
 
 ## Two-pass parsing strategy
 
-The parser uses two passes over the interface list to handle forward references:
+The parser uses two passes to handle forward references and `extends` correctly.
 
-**Pass 1** — register all interface names in `interfaceMap` with empty field arrays. This ensures that when pass 2 encounters a type reference like `author: User`, the name `"User"` already exists in the map.
+**Pass 1** — iterate all top-level statements in source order. Register every `interface` declaration and every `type` alias whose body is an object literal (`{ ... }`) in `interfaceMap` with an empty `SchemaField[]`. Iterating statements preserves declaration order, which controls the order of results and UI selector pills.
 
-**Pass 2** — parse each interface's properties and populate `interfaceMap` with the resolved fields.
+**Pass 2** — iterate statements again in source order. For each `interface`:
+1. Look up any `extends` base types and copy their already-populated fields in first
+2. Push the interface's own resolved properties after
 
-Without this, an interface that references another declared below it would silently fall back to `type: "string"` instead of the full nested object.
+For each `type` alias, push its resolved properties.
+
+All arrays are populated **in place** (via `push`, never by reassignment). This means array object references captured in pass 1 — used as `children` by type references — are automatically up to date after pass 2 completes. A type like `user: User` resolved in pass 1 gets a reference to the same array that pass 2 fills in.
+
+```
+Pass 1:  interfaceMap = { User: [], AdminUser: [], Post: [] }
+                                  ↑           ↑         ↑
+                              same array objects
+
+Pass 2:  User → push [id, name, email]       ← User's array now populated
+         AdminUser → copy User's fields, push [role, permissions]
+         Post → push [title, body, author]   ← author.children = User's array (auto-updated)
+```
+
+---
+
+## Supported TypeScript shapes
+
+### `interface` and `export type` aliases
+
+```ts
+interface User { id: string }
+export type Profile = { avatar: string }
+```
+
+### `extends` inheritance
+
+Derived interfaces include all fields from their base, in order (base fields first):
+
+```ts
+interface User { id: number; name: string }
+
+interface AdminUser extends User {
+  role: 'admin';        // AdminUser gets id, name, role, permissions
+  permissions: string[];
+}
+```
+
+Multi-level inheritance is supported. The base interface must be declared before the derived one in the source.
+
+### Literal unions
+
+```ts
+type Settings = {
+  theme: 'light' | 'dark';           // enum: ["light", "dark"]
+  tier: 'free' | 'premium';          // enum: ["free", "premium"]
+  priority: 1 | 2 | 3;              // enum: [1, 2, 3]
+  role: 'admin';                     // enum: ["admin"] — single literal
+}
+```
+
+### Cross-type references (including forward references)
+
+```ts
+export type Profile = { bio: string }  // declared first
+
+export type User = {
+  id: number;
+  profile: Profile;      // resolves to full Profile shape
+}
+```
+
+Or in reverse order — the two-pass strategy handles both:
+
+```ts
+interface Order {
+  items: LineItem[];     // LineItem declared below — still resolves correctly
+}
+interface LineItem { sku: string; qty: number }
+```
 
 ---
 

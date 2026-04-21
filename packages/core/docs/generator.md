@@ -1,6 +1,6 @@
 # generator.ts
 
-Turns a `SchemaField[]` (the parser's output) into an array of plain JavaScript objects. This is the third and final stage of the core pipeline. It delegates all value decisions to `inference.ts` — its own job is purely structural: how many records, recurse into objects, expand arrays, respect optionals.
+Turns a `SchemaField[]` (the parser's output) into an array of plain JavaScript objects. This is the third and final stage of the core pipeline. It delegates all value decisions to `inference.ts` — its own job is purely structural: how many records, handle enum fields, recurse into objects, expand arrays, respect optionals.
 
 ---
 
@@ -49,9 +49,12 @@ Handles the structural routing for a single field:
 
 | Field shape | Action |
 |---|---|
+| `field.enum` is set | `faker.helpers.arrayElement(field.enum)` — picks one of the declared values |
 | `type === "object"` with `children` | Recurses into `generateObject(field.children)` |
 | `type === "array"` with `children` | Generates 1–5 elements by calling `generateField(children[0])` in a loop |
 | Anything else | Delegates to `inferValue(field.name, field.type, faker)` |
+
+The `enum` check runs first. This means literal union types (`'light' | 'dark'`, `1 | 2 | 3`) and single literals (`'admin'`) always produce values from the declared set, regardless of what the inference engine would otherwise pick for that field name.
 
 Array length is randomized via `faker.number.int({ min: 1, max: 5 })` on each call, so different records in the same batch will have different-length arrays — this is intentional for realism.
 
@@ -69,9 +72,10 @@ generateFromFields(fields, options)
             └─ for each field:
                  ├─ skip if optional & coin flip
                  └─ generateField(field)
-                      ├─ if object  → generateObject(children)   ← recursive
-                      ├─ if array   → generateField($element) × N
-                      └─ otherwise  → inferValue(name, type, faker)
+                      ├─ if enum       → arrayElement(field.enum)  ← literal union values
+                      ├─ if object     → generateObject(children)  ← recursive
+                      ├─ if array      → generateField($element) × N
+                      └─ otherwise     → inferValue(name, type, faker)
 ```
 
 ---

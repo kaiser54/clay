@@ -1,6 +1,6 @@
 # index.ts
 
-The mock API server for Clay. Takes a TypeScript source string, parses every interface in it, generates an in-memory dataset for each, and starts a Hono HTTP server with REST endpoints for all resources. The server runs until the process is killed — it has no persistence layer, no database, and no state between requests.
+The mock API server for Clay. Takes a TypeScript source string, parses every interface and type alias in it, generates an in-memory dataset for each, and starts a Hono HTTP server with REST endpoints for all resources. The server runs until the process is killed — it has no persistence layer, no database, and no state between requests.
 
 **Dependencies:** `hono`, `@hono/node-server`, `@clay/core`
 
@@ -28,25 +28,25 @@ startServer({
 
 | Property | Type | Default | Description |
 |---|---|---|---|
-| `sourceCode` | `string` | required | Raw TypeScript source containing one or more interfaces |
+| `sourceCode` | `string` | required | Raw TypeScript source — `interface` and `type` aliases both supported |
 | `port` | `number` | `3000` | HTTP port to listen on |
 | `count` | `number` | `10` | Number of records to generate per resource |
 | `seed` | `number` | (none) | Deterministic seed. Same seed + same file = same API data every run. |
 
-Throws if the source contains no interfaces.
+Throws if the source contains no interfaces or type aliases.
 
 ---
 
 ## Resource naming — `toResourceName()`
 
-Each interface name is converted to a URL-safe, lowercase plural resource name using two regex passes:
+Each interface/type name is converted to a URL-safe, lowercase plural resource name:
 
 ```
-User          →  users
-Product       →  products
-BlogPost      →  blog-posts
-UserProfile   →  user-profiles
-ProductCategory → product-categories
+User            →  users
+Product         →  products
+BlogPost        →  blog-posts
+UserProfile     →  user-profiles
+AdminUser       →  admin-users
 ```
 
 The algorithm:
@@ -61,13 +61,17 @@ This matches common REST API conventions so frontend code built against Clay can
 
 ## In-memory data store
 
-On startup, `startServer` calls `parseTypeScript` (all interfaces) and `generateFromFields` for each one. All generated records are stored in a `Map<string, Record<string, unknown>[]>` keyed by resource name.
+On startup, `startServer` calls `parseTypeScript` (returns `ParsedInterface[]`) and `generateFromFields` for each interface. All generated records are stored in a `Map<string, Record<string, unknown>[]>` keyed by resource name.
 
 The dataset is created **once** and never mutated during the server's lifetime. Every request reads from this static snapshot. This means:
 
 - No write operations — `POST`, `PUT`, `PATCH`, `DELETE` are not implemented
 - The data is always consistent (no concurrency issues)
 - Restarting the server with the same seed gives back the same data
+
+### Multiple types in one file
+
+A file with `interface User`, `interface AdminUser extends User`, and `type Product = { ... }` produces three independent resources: `users`, `admin-users`, and `products`. Each gets its own fully populated dataset.
 
 ---
 
@@ -151,6 +155,8 @@ When the server is ready, it prints the full URLs of all endpoints:
 
   GET http://localhost:3000/api/users
   GET http://localhost:3000/api/users/:id
+  GET http://localhost:3000/api/admin-users
+  GET http://localhost:3000/api/admin-users/:id
   GET http://localhost:3000/api/products
   GET http://localhost:3000/api/products/:id
 ```

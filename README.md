@@ -1,8 +1,8 @@
 # Clay
 
-**Paste a TypeScript interface. Get realistic mock data and a live API — instantly.**
+**Paste a TypeScript type or interface. Get realistic mock data and a live API — instantly.**
 
-Clay turns your TypeScript type definitions into realistic JSON fixtures and a fully functional local REST API. No config files, no schemas to learn, no setup ceremony.
+Clay turns your TypeScript type definitions into realistic JSON fixtures and a fully functional local REST API. No config files, no schemas to learn, no setup ceremony. Works with `interface`, `type` aliases, `extends` inheritance, literal unions, and cross-type references.
 
 ```ts
 // types.ts
@@ -56,8 +56,9 @@ Most mock data tools generate noise. Clay generates intent.
 | `rating` | `94729` | `3.6` (1–5 scale) |
 | `discount` | `999` | `22.7` (0–80%) |
 | `salary` | `47` | `76500` (rounded to $500) |
+| `theme: 'light' \| 'dark'` | `"lorem"` | `"light"` or `"dark"` |
 
-The field name is the signal. Clay reads it and infers the right kind of value — type-aware, range-aware, semantically grounded.
+The field name is the signal. Clay reads it and infers the right kind of value — type-aware, range-aware, semantically grounded. Literal union types are always respected exactly.
 
 ---
 
@@ -106,13 +107,13 @@ clay generate ./types.ts --out ./fixtures/users.json
 | `--seed, -s` | (random) | Fixed seed for reproducible output |
 | `--out, -o` | stdout | Write to a file instead of printing |
 
-**Only the first interface in the file is used** for `generate`. To generate data for multiple interfaces, use `serve`.
+By default the first type/interface in the file is used. Pass `--interface <name>` to target a specific one.
 
 ---
 
 ### `clay serve <file>`
 
-Start a local mock REST API server. Every interface in the file becomes a resource.
+Start a local mock REST API server. Every interface/type in the file becomes a resource.
 
 ```bash
 clay serve ./types.ts
@@ -126,6 +127,24 @@ clay serve ./types.ts --port 4000 --count 20 --seed 42
 | `--seed, -s` | (random) | Fixed seed — restart the server with the same seed to get the same data |
 
 After starting, open `http://localhost:3000` in a browser to see a dashboard of all live endpoints.
+
+---
+
+## Web UI
+
+Clay ships a browser-based UI for interactive mock generation:
+
+```bash
+cd apps/web
+pnpm dev
+# open http://localhost:5173
+```
+
+- Paste any TypeScript `interface` or `type` definition
+- When multiple types are present, pills appear to select which one to generate
+- Configure record count, seed, and per-page pagination
+- Copy the JSON output with one click
+- `⌘ Enter` to generate from keyboard
 
 ---
 
@@ -163,22 +182,18 @@ Response:
 
 ---
 
-## TypeScript interface support
+## TypeScript support
 
-Clay understands a wide range of TypeScript interface shapes.
+Clay handles the full range of real-world TypeScript shapes.
 
-### Primitive fields
+### `interface` and `type` aliases
+
+Both work identically:
 
 ```ts
-interface User {
-  id: string;          // → UUID
-  name: string;        // → "John Doe" (full name)
-  email: string;       // → "john@gmail.com"
-  age: number;         // → 18–75
-  active: boolean;     // → true/false
-  createdAt: string;   // → ISO date, 2–4 years ago
-  updatedAt: string;   // → ISO date, within 2025
-}
+interface User { id: string; name: string }
+
+export type Profile = { avatar: string; bio: string }
 ```
 
 ### Optional fields
@@ -190,6 +205,50 @@ interface Post {
   subtitle?: string;   // present in ~70% of records, absent in ~30%
 }
 ```
+
+### Literal union types (enums)
+
+Values are always chosen from the declared members — never invented:
+
+```ts
+type Settings = {
+  theme: 'light' | 'dark';               // → "light" or "dark"
+  tier: 'free' | 'premium' | 'enterprise'; // → one of the three
+  priority: 1 | 2 | 3;                   // → 1, 2, or 3
+}
+```
+
+Single literals are also locked:
+
+```ts
+interface AdminUser {
+  role: 'admin';   // → always "admin"
+}
+```
+
+### Interface inheritance (`extends`)
+
+Derived interfaces include all fields from their base:
+
+```ts
+interface User {
+  id: number;
+  name: string;
+  email: string;
+}
+
+interface AdminUser extends User {
+  role: 'admin';         // locked literal
+  permissions: string[];
+}
+
+interface RegularUser extends User {
+  role: 'user';          // locked literal
+  subscriptionTier: 'free' | 'premium' | 'enterprise';
+}
+```
+
+`AdminUser` records will have `id`, `name`, `email`, `role`, and `permissions`. Multiple levels of inheritance are supported.
 
 ### Arrays
 
@@ -211,22 +270,21 @@ interface User {
 }
 ```
 
-### Cross-interface references
+### Cross-type references
 
 ```ts
-interface Author {
-  id: string;
-  name: string;
-}
+export type Profile = { avatar: string; bio: string }
 
-interface Post {
-  id: string;
-  title: string;
-  author: Author;    // → generates an Author-shaped nested object
+export type User = {
+  id: number;
+  name: string;
+  profile: Profile;   // → generates a full Profile-shaped object
 }
 ```
 
-### Union types
+Forward references work — order of declaration doesn't matter.
+
+### Union with null/undefined
 
 ```ts
 interface User {
@@ -340,6 +398,8 @@ Clay uses a scored rule system. Field names are matched against patterns; the mo
 
 ### Status & enums
 
+> Note: inference rules are a fallback. If a field has an explicit literal union type (`role: 'admin' | 'user'`), the declared values are always used instead of the inference table below.
+
 | Field name(s) | Generated value |
 |---|---|
 | `status` | `"active"`, `"inactive"`, `"pending"`, `"archived"` |
@@ -381,7 +441,7 @@ clay/
 │   ├── core/          @clay/core — parser + inference + generator
 │   │   ├── src/
 │   │   │   ├── types.ts       shared type definitions
-│   │   │   ├── parser.ts      TypeScript AST → SchemaField[]
+│   │   │   ├── parser.ts      TypeScript AST → ParsedInterface[]
 │   │   │   ├── inference.ts   field name → realistic value
 │   │   │   ├── generator.ts   SchemaField[] → object[]
 │   │   │   └── index.ts       public API
@@ -396,6 +456,13 @@ clay/
 │       ├── src/
 │       │   └── index.ts       startServer() + route handlers
 │       └── docs/
+│
+├── apps/
+│   └── web/           React + Vite browser UI
+│       ├── src/
+│       │   ├── App.tsx        main UI component
+│       │   └── App.module.css dark-theme CSS Modules
+│       └── api.ts             Hono API server (port 3001)
 │
 ├── example.ts             single-interface example (User)
 ├── example-product.ts     product interface
@@ -419,6 +486,13 @@ pnpm --filter @clay/core test    # core only
 ```bash
 pnpm build                       # all packages
 pnpm --filter @clay/core build   # core only (required before running CLI/server)
+```
+
+### Web UI dev server
+
+```bash
+cd apps/web
+pnpm dev   # starts Vite on :5173 + API server on :3001 concurrently
 ```
 
 ### Add an inference rule

@@ -34,13 +34,13 @@ clay generate ./types.ts --count 20 --out ./fixtures/users.json
 4. Serializes the result with `JSON.stringify(..., null, 2)` for readable output
 5. Prints to stdout or writes to `--out` if provided
 
-**Only the first interface in the file is used.** If your file has `User`, `Post`, and `Comment` interfaces, only `User` data is generated. Use `clay serve` to get data for all interfaces at once.
+Works with both `interface` and `type` alias declarations. The first type/interface in the file is used by default. Use `clay serve` to get data for all types at once.
 
 ---
 
 ### `clay serve <file>`
 
-Starts a local HTTP mock API server from a TypeScript file. All interfaces in the file become API resources.
+Starts a local HTTP mock API server from a TypeScript file. All interfaces and type aliases in the file become API resources.
 
 ```bash
 clay serve ./types.ts
@@ -62,14 +62,14 @@ clay serve ./types.ts --count 50 --seed 42
 3. The server starts and prints the available endpoints to the terminal
 4. Process stays alive (the Hono server keeps the event loop running)
 
-**All interfaces in the file become resources.** A file with `User`, `Product`, and `Order` interfaces will expose:
+**All types in the file become resources.** A file with `User`, `AdminUser extends User`, and `type Product = { ... }` will expose:
 ```
 GET http://localhost:3000/api/users
 GET http://localhost:3000/api/users/:id
+GET http://localhost:3000/api/admin-users
+GET http://localhost:3000/api/admin-users/:id
 GET http://localhost:3000/api/products
 GET http://localhost:3000/api/products/:id
-GET http://localhost:3000/api/orders
-GET http://localhost:3000/api/orders/:id
 ```
 
 ---
@@ -79,7 +79,7 @@ GET http://localhost:3000/api/orders/:id
 Both commands exit with code `1` and print an error message in two failure cases:
 
 - **File not found** — `Error: could not read file "<path>"`
-- **No interface in file** — `Error: No interface found in source code`
+- **No type in file** — `Error: No interface found in source code`
 
 ---
 
