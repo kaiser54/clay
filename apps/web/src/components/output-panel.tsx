@@ -15,6 +15,34 @@ type OutputPanelProps = {
   className?: string;
 };
 
+function PaginationBar({
+  page,
+  totalPages,
+  onPageChange,
+}: {
+  page: number;
+  totalPages: number;
+  onPageChange: (page: number) => void;
+}) {
+  return (
+    <div className={styles.pagination} aria-label="Page through results">
+      <button type="button" onClick={() => onPageChange(Math.max(1, page - 1))} disabled={page <= 1}>
+        ‹
+      </button>
+      <span>
+        {page} / {totalPages}
+      </span>
+      <button
+        type="button"
+        onClick={() => onPageChange(Math.min(totalPages, page + 1))}
+        disabled={page >= totalPages}
+      >
+        ›
+      </button>
+    </div>
+  );
+}
+
 export function OutputPanel({
   data,
   error,
@@ -29,6 +57,7 @@ export function OutputPanel({
 }: OutputPanelProps) {
   const showEmpty = !data && !error && !loading;
   const showJson = data && !loading;
+  const showPagination = Boolean(data && !loading && data.length > 0 && totalPages > 0);
 
   return (
     <div className={`${styles.panel} ${className ?? ""}`}>
@@ -39,23 +68,7 @@ export function OutputPanel({
         </span>
 
         <div className={styles.panelActions}>
-          {data && totalPages > 1 ? (
-            <div className={styles.pagination}>
-              <button type="button" onClick={() => onPageChange(Math.max(1, page - 1))} disabled={page === 1}>
-                ‹
-              </button>
-              <span>
-                {page} / {totalPages}
-              </span>
-              <button
-                type="button"
-                onClick={() => onPageChange(Math.min(totalPages, page + 1))}
-                disabled={page === totalPages}
-              >
-                ›
-              </button>
-            </div>
-          ) : null}
+          {showPagination ? <PaginationBar page={page} totalPages={totalPages} onPageChange={onPageChange} /> : null}
 
           {data ? (
             <button
