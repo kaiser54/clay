@@ -32,7 +32,7 @@ score: number      →  0–100 with one decimal
 
 ### `inferValue(fieldName: string, fieldType: FieldType, faker: Faker): unknown`
 
-The only export. Called once per field per record.
+The only export. Called once per field per record — but only when the field has no `enum` set. When a `SchemaField` has an `enum` array (i.e., the field is a literal union type like `'light' | 'dark'`), the generator picks from that array directly and never calls `inferValue`.
 
 - Walks the rule list in score order (highest first)
 - Skips rules whose `guard` type doesn't match `fieldType`

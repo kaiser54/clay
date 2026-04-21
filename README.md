@@ -107,7 +107,7 @@ clay generate ./types.ts --out ./fixtures/users.json
 | `--seed, -s` | (random) | Fixed seed for reproducible output |
 | `--out, -o` | stdout | Write to a file instead of printing |
 
-By default the first type/interface in the file is used. Pass `--interface <name>` to target a specific one.
+By default the first type/interface in the file is used. To generate data for a specific type, use the Web UI interface selector or `clay serve` to expose all types as API resources.
 
 ---
 
@@ -458,16 +458,23 @@ clay/
 │       └── docs/
 │
 ├── apps/
-│   └── web/           React + Vite browser UI
+│   └── web/           React 19 + Vite browser UI
 │       ├── src/
-│       │   ├── App.tsx        main UI component
-│       │   └── App.module.css dark-theme CSS Modules
-│       └── api.ts             Hono API server (port 3001)
+│       │   ├── api/           fetch wrappers for /api/generate and /api/parse
+│       │   ├── components/    AppChrome, EditorPanel, OutputPanel, InterfacePills, etc.
+│       │   ├── hooks/         useMockGeneration, usePagination, useCopyFeedback, etc.
+│       │   ├── lib/           json-highlight.ts
+│       │   ├── types/         shared web types (clay.ts)
+│       │   ├── constants/     editor-placeholder.ts
+│       │   └── App.tsx        root component (composition only)
+│       ├── api.ts             Hono API server (port 3001)
+│       └── docs/              web app architecture docs
 │
-├── example.ts             single-interface example (User)
-├── example-product.ts     product interface
-├── example-shop.ts        multi-interface (User + Product + Order)
-└── example-employee.ts    financial fields (salary, tax, discount, rating)
+└── test-types/        TypeScript example files for manual testing
+    ├── example.ts
+    ├── example-product.ts
+    ├── example-shop.ts
+    └── example-employee.ts
 ```
 
 ---
@@ -520,13 +527,14 @@ it("referralCode is 8 uppercase chars", () => {
 
 ## Package docs
 
-Each package has a `docs/` folder — one Markdown file per source file:
+Each package has a `docs/` folder:
 
-- [`packages/core/docs/types.md`](packages/core/docs/types.md) — shared type definitions
-- [`packages/core/docs/parser.md`](packages/core/docs/parser.md) — TypeScript AST parser
-- [`packages/core/docs/inference.md`](packages/core/docs/inference.md) — semantic inference engine
-- [`packages/core/docs/generator.md`](packages/core/docs/generator.md) — record generator
+- [`packages/core/docs/types.md`](packages/core/docs/types.md) — shared type definitions (`SchemaField`, `ParsedInterface`, `GenerateOptions`)
+- [`packages/core/docs/parser.md`](packages/core/docs/parser.md) — TypeScript AST parser (two-pass strategy, literal unions, extends)
+- [`packages/core/docs/inference.md`](packages/core/docs/inference.md) — semantic inference engine (rule system, distributions)
+- [`packages/core/docs/generator.md`](packages/core/docs/generator.md) — record generator (enum handling, optional fields, arrays)
 - [`packages/core/docs/index.md`](packages/core/docs/index.md) — public API surface
 - [`packages/core/docs/tests.md`](packages/core/docs/tests.md) — test suite guide
 - [`packages/cli/docs/index.md`](packages/cli/docs/index.md) — CLI commands reference
 - [`packages/server/docs/index.md`](packages/server/docs/index.md) — mock server internals
+- [`apps/web/docs/index.md`](apps/web/docs/index.md) — web UI architecture, hooks, API endpoints
