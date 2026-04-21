@@ -3,6 +3,10 @@ import { inferValue } from "./inference.js";
 import type { SchemaField, GenerateOptions } from "./types.js";
 
 function generateField(field: SchemaField): unknown {
+  if (field.enum && field.enum.length > 0) {
+    return faker.helpers.arrayElement(field.enum);
+  }
+
   if (field.type === "object" && field.children) {
     return generateObject(field.children);
   }

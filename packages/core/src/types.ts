@@ -6,9 +6,16 @@ export type SchemaField = {
   optional: boolean;
   /** element type for arrays, properties for objects */
   children?: SchemaField[];
+  /** possible values for literal union types: 'light' | 'dark', 1 | 2 | 3 */
+  enum?: (string | number | boolean)[];
 };
 
 export type GenerateOptions = {
   count?: number;
   seed?: number;
+};
+
+export type ParsedInterface = {
+  name: string;
+  fields: SchemaField[];
 };
