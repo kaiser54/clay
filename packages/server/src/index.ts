@@ -28,22 +28,16 @@ function findIdField(record: Record<string, unknown>): string | number | undefin
 export function startServer(options: ServerOptions): void {
   const { sourceCode, port = 3000, count = 10, seed } = options;
 
-  const allFields = parseTypeScript(sourceCode);
-  if (allFields.length === 0) throw new Error("No interfaces found in source file");
+  const parsed = parseTypeScript(sourceCode);
+  if (parsed.length === 0) throw new Error("No interfaces found in source file");
 
   // Build resource stores: { users: [...], products: [...] }
   const stores = new Map<string, Record<string, unknown>[]>();
-  const interfaceNames: string[] = [];
 
-  // Re-extract names to align with parsed fields
-  const nameMatch = [...sourceCode.matchAll(/interface\s+(\w+)/g)].map((m) => m[1]);
-
-  for (let i = 0; i < allFields.length; i++) {
-    const name = nameMatch[i] ?? `resource${i}`;
+  for (const { name, fields } of parsed) {
     const resource = toResourceName(name);
-    const records = generateFromFields(allFields[i], { count, seed });
+    const records = generateFromFields(fields, { count, seed });
     stores.set(resource, records);
-    interfaceNames.push(name);
   }
 
   const app = new Hono();
