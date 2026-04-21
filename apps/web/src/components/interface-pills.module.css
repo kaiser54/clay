@@ -1,0 +1,50 @@
+.ifaceSelector {
+  flex-shrink: 0;
+  padding: 0.5rem 1rem;
+  border-top: 1px solid var(--border);
+  background: var(--surface);
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+}
+
+.ifaceLabel {
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.ifacePills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.ifacePill {
+  padding: 0.2rem 0.6rem;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  border-radius: 6px;
+  font-size: 0.73rem;
+  font-family: var(--mono);
+  cursor: pointer;
+  transition:
+    color 0.12s ease,
+    border-color 0.12s ease,
+    background 0.12s ease;
+}
+
+.ifacePill:hover {
+  color: var(--text);
+  border-color: var(--border-focus);
+}
+
+.ifacePillActive {
+  background: var(--accent-muted-bg);
+  color: var(--accent);
+  border-color: var(--accent-muted-border);
+}

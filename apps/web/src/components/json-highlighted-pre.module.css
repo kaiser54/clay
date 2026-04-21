@@ -1,0 +1,29 @@
+.jsonOutput {
+  padding: 1rem 1.1rem;
+  font-family: var(--mono);
+  font-size: 0.78rem;
+  line-height: 1.65;
+  color: var(--text);
+  white-space: pre;
+  overflow: visible;
+}
+
+:global(.jk) {
+  color: #7dd3fc;
+}
+
+:global(.js) {
+  color: #86efac;
+}
+
+:global(.jnum) {
+  color: #fdba74;
+}
+
+:global(.jb) {
+  color: #c4b5fd;
+}
+
+:global(.jn) {
+  color: #94a3b8;
+}
