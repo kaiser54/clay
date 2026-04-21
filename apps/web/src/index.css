@@ -1,11 +1,72 @@
-*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
 
-html, body, #root {
+:root {
+  --bg: #080807;
+  --bg-elevated: #0c0c0b;
+  --surface: #10100f;
+  --surface-2: #161615;
+  --border: #242422;
+  --border-focus: #343431;
+  --text: #e8e6e3;
+  --text-muted: #7a776f;
+  --accent: #7cf096;
+  --accent-hover: #5ede7a;
+  --accent-dim: #3d9a52;
+  --accent-muted-bg: #0f2918;
+  --accent-muted-border: #1a5c34;
+  --error-bg: #1a0a0a;
+  --error-border: #7f1d1d;
+  --error-text: #fca5a5;
+  --font-display: "Instrument Serif", "Iowan Old Style", Georgia, serif;
+  --font-body: "DM Sans", system-ui, -apple-system, sans-serif;
+  --mono: "JetBrains Mono", "Fira Code", "Cascadia Code", "SF Mono", ui-monospace, monospace;
+}
+
+html,
+body,
+#root {
   height: 100%;
   overflow: hidden;
-  background: #0a0a0a;
-  color: #e5e7eb;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+body {
+  position: relative;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-body);
   font-size: 14px;
+  font-optical-sizing: auto;
   -webkit-font-smoothing: antialiased;
+}
+
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  opacity: 0.055;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  background:
+    radial-gradient(ellipse 120% 80% at 10% -20%, rgba(124, 240, 150, 0.07), transparent 55%),
+    radial-gradient(ellipse 90% 70% at 95% 110%, rgba(120, 180, 255, 0.04), transparent 50%);
+}
+
+#root {
+  position: relative;
+  z-index: 1;
 }
